@@ -36,23 +36,6 @@ unsigned char start_pos = 0x80;
 
 unsigned char inputs[9] = {0xFF, 0xC7, 0xE3, 0xE7, 0xE7, 0xFB, 0xFB, 0xFB, 0xFB};
 
-enum Input_States {I_Start, I_DropBlock, I_Hold} i_state;
-
-int I_Tick(int state {
-	//local variables
-	static unsigned char drop_btn = ~PINA & 0x40; //pin A6
-	
-	switch (state) { //transitions
-		
-	}
-	
-	switch (state) { //state actions
-	
-	}
-
-	return state;
-}
-
 enum MB_States {MB_Start, MB_Right, MB_Left} mb_state;
 
 int MB_Tick(int state) {
@@ -199,14 +182,14 @@ int DB_Tick(int state) {
 						block_dropped |= (0x01 << k); //shift lsb = 1 to k position -> off = 1
 					}
 					
-					tmpcurr_block = tmpcurr_block >> 1;	//shift right to get next lsb
-					prev_block = prev_block >> 1;	//shift right to get next lsb
+					tmpcurr_block = tmpcurr_block >> 1;
+					prev_block = prev_block >> 1;
 				}
 				
-				blocks_dropped[j] = block_dropped;	//block dropped gets added to the set of blocks that have already been dropped
+				blocks_dropped[j] = block_dropped;
 			}
 			else {
-				blocks_dropped[j] = tmpcurr_block;	//first block dropped is the current block dropped
+				blocks_dropped[j] = tmpcurr_block;
 			}
 			
 			if (j < 8) {
