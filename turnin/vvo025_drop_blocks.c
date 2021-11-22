@@ -8,7 +8,7 @@
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
  *	
- *	Demo Link:
+ *	Demo Link: https://youtu.be/0tT-UEeZVoo
  *
  */
 #include <avr/io.h>
@@ -21,22 +21,92 @@
 #endif
 
 //global variables
-unsigned char blocks[9] = {0xFF, 0xC7, 0xC7, 0xE7, 0xE7, 0xE7, 0xF7, 0xF7, 0xF7};
-unsigned char blocks_speed[9] = {0, 6, 6, 4, 4, 4, 2, 2, 2}; //speed of blocks moving side to side
-unsigned char end_pos[9] = {0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}; //stopping position of block
-unsigned char blocks_dropped[9] = {0xFF, 0xC7, 0xC7, 0xE7, 0xE7, 0xFF, 0xFF, 0xFF, 0xFF}; //block tower
-unsigned char j = 5; // blocks array pointer -> initially set to 1
-//j = 0 to set moving block side to side in top row 0x80 & 
+unsigned char blocks[10] = {0xFF, 0xFF, 0xC7, 0xC7, 0xE7, 0xE7, 0xE7, 0xF7, 0xF7, 0xF7};
+unsigned char blocks_speed[10] = {0, 0, 6, 6, 4, 4, 4, 2, 2, 2}; //speed of blocks moving side to side
+unsigned char end_pos[10] = {0x00, 0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}; //stopping position of block
+unsigned char blocks_dropped[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //block tower
+unsigned char j = 2; // blocks array pointer -> initially set to 1
+//j = 0 to set moving block side to side in top row 0x80 or blocks dropping
 
 
 unsigned char curr_block; //current block that is moving side to side (col)
-unsigned char next_block; //boolean: 1 -> allow next block to start moving side to side, 0 -> block still dropping / being calculated / displaying end game results 
+unsigned char next_block = 1; //boolean: 1 -> allow next block to start moving side to side, 0 -> block still dropping / being calculated / displaying end game results 
+unsigned char drop = 0; //boolean: 1 -> block that is moving side to side stops and drops, 0 -> block does not drop and continues to move side to side
+
 //const variable
 unsigned char start_pos = 0x80;
+unsigned char off = 0xFF;
 
-unsigned char inputs[9] = {0xFF, 0xC7, 0xE3, 0xE7, 0xE7, 0xFB, 0xFB, 0xFB, 0xFB};
+//unsigned char inputs[9] = {0xFF, 0xC7, 0xE3, 0xE7, 0xE7, 0xF3, 0xFB, 0xFB, 0xFB};
 
-enum MB_States {MB_Start, MB_Right, MB_Left} mb_state;
+enum Input_States {I_Start, I_Wait, I_DropBlock, I_Hold} i_state;
+
+int I_Tick(int state) {
+	//local variables
+	unsigned char drop_btn = ~PINA & 0x40; //pin A6
+	
+	switch (state) { //transitions
+		case I_Start:
+			state = I_Wait;
+			break;
+			
+		case I_Wait:
+			if (drop_btn && next_block) {
+				state = I_DropBlock;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+			break;
+			
+		case I_DropBlock:
+			if (drop_btn) {
+				state = I_Hold;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+			break;
+			
+		case I_Hold:
+			if (drop_btn) {
+				state = I_Hold;
+				drop = 0;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+			break;
+			
+		default:
+			break;
+	}
+	
+	switch (state) { //state actions
+		case I_Wait:
+			drop = 0;
+			PORTD = 0x00;
+			break;
+			
+		case I_DropBlock:
+			drop = 1;
+			PORTD = 0x40;
+			break;
+			
+		case I_Hold:
+			break;
+			
+		default:
+			break;
+	}
+
+	return state;
+}
+
+enum MB_States {MB_Start, MB_Right, MB_Left, MB_Drop} mb_state;
 
 int MB_Tick(int state) {
 	//local variables
@@ -52,24 +122,52 @@ int MB_Tick(int state) {
 			curr_block = blocks[j];
 			speed = blocks_speed[j];
 			
+			end_pos[0] = start_pos;
+			blocks_dropped[0] = curr_block;
+			
 			break;
 			
 		case MB_Right:
-			if (i < speed) {
-				state = MB_Right; 
+			if (drop) {
+				state = MB_Drop;
 			}
 			else {
-				state = MB_Left;
+				if (i < speed) {
+					state = MB_Right; 
+				}
+				else {
+					state = MB_Left;
+				}
+			}
+			break;
+		
+		case MB_Left:
+			if (drop) {
+				state = MB_Drop;
+			}
+			else {
+				if (i < speed) {
+					state = MB_Left;
+				}
+				else {
+					state = MB_Right;
+				}
 			}
 			
 			break;
 		
-		case MB_Left:
-			if (i < speed) {
-				state = MB_Left;
+		case MB_Drop:
+			if (next_block) {
+				state = MB_Right;
+				
+				curr_block = blocks[j];
+				speed = blocks_speed[j];
+				
+				end_pos[0] = start_pos;
+				blocks_dropped[0] = curr_block;
 			}
 			else {
-				state = MB_Right;
+				state = MB_Drop; 
 			}
 			
 			break;
@@ -88,6 +186,9 @@ int MB_Tick(int state) {
 				}	
 			}
 			
+			end_pos[0] = start_pos;
+			blocks_dropped[0] = curr_block;
+			
 			break;
 		
 		case MB_Left:
@@ -99,18 +200,25 @@ int MB_Tick(int state) {
 				}	
 			}
 			
+			end_pos[0] = start_pos;
+			blocks_dropped[0] = curr_block;
+			
+			break;
+		
+		case MB_Drop:
+			blocks_dropped[0] = off;
+			end_pos[0] = 0x00;
+			blocks_dropped[1] = curr_block;
 			break;
 		
 		default:
 			break;
 	}
 	
-	end_pos[0] = start_pos;
-	blocks_dropped[0] = curr_block;
 	return state;
 }
 
-enum DB_States {DB_Start, DB_Fall, DB_CalculateBlock, DB_DisplayLose} db_state;
+enum DB_States {DB_Start, DB_Wait, DB_Fall, DB_CalculateBlock, DB_DisplayLose, DB_DisplayWin} db_state;
 
 int DB_Tick(int state) {
 	//local variables
@@ -123,16 +231,22 @@ int DB_Tick(int state) {
 	
 	switch (state) { //transitions
 		case DB_Start:
-			state = DB_Fall;
-			db_row = start_pos;
-			curr_block = inputs[1];
-			blocks_dropped[0] = curr_block;
+			state = DB_Wait;
 			break;
 			
+		case DB_Wait:
+			if (drop) {
+				state = DB_Fall;
+				db_row = start_pos;
+				next_block = 0;
+			}
+			else {
+				state = DB_Wait;
+			}
+		
 		case DB_Fall:
 			if (db_row != end_pos[j]) { 
 				db_row = db_row >> 1;
-				end_pos[0] = db_row;
 				state = DB_Fall;
 			}
 			else {
@@ -146,17 +260,25 @@ int DB_Tick(int state) {
 				state = DB_DisplayLose;
 			}
 			else {
-				state = DB_Fall;
-				curr_block = inputs[j];
-				blocks_dropped[0] = curr_block;
-				db_row = start_pos;
+				if (j > 8) {
+					state = DB_DisplayWin;
+				}
+				else {
+					state = DB_Wait;
+					next_block = 1;
+					blocks_dropped[1] = off;
+					end_pos[1] = 0x00;
+				}
 			}
 			
 			break;
 			
 		case DB_DisplayLose:
 			state = DB_DisplayLose;
+			break;
 			
+		case DB_DisplayWin:
+			state = DB_DisplayWin;
 			break;
 		
 		default:
@@ -165,6 +287,7 @@ int DB_Tick(int state) {
 	
 	switch (state) { //state actions
 		case DB_Fall:
+			end_pos[1] = db_row;
 			break;
 			
 		case DB_CalculateBlock:
@@ -182,26 +305,26 @@ int DB_Tick(int state) {
 						block_dropped |= (0x01 << k); //shift lsb = 1 to k position -> off = 1
 					}
 					
-					tmpcurr_block = tmpcurr_block >> 1;
-					prev_block = prev_block >> 1;
+					tmpcurr_block = tmpcurr_block >> 1;	//shift right to get next lsb
+					prev_block = prev_block >> 1;	//shift right to get next lsb
 				}
 				
-				blocks_dropped[j] = block_dropped;
+				blocks_dropped[j] = block_dropped;	//block dropped gets added to the set of blocks that have already been dropped
 			}
 			else {
-				blocks_dropped[j] = tmpcurr_block;
+				blocks_dropped[j] = tmpcurr_block;	//first block dropped is the current block dropped
 			}
 			
-			if (j < 8) {
-				j++;
-			}
+			j++;
 			
 			break;
 			
 		case DB_DisplayLose:
-		
 			break;
 		
+		case DB_DisplayWin:
+			break;
+			
 		default:
 			break;
 	}
@@ -262,30 +385,37 @@ int LM_Tick(int state) {
 int main(void) {
     /* Insert DDR and PORT initializations */
 	DDRC = 0xFF; PORTC = 0x00; //initialize PORTC -> outputs
+	DDRD = 0xFF; PORTD = 0x00; //initialize PORTD -> outputs
 	DDRA = 0x0F; PORTA = 0xF0; //initialize PORTA -> A7-A4 inputs & A3-A0 outputs
 	
 	//declare an array of tasks
-	static task task1, task3;
-	task *tasks[] = {&task1, &task3};
+	static task task1, task2, task3, task4;
+	task *tasks[] = {&task1, &task2, &task3, &task4};
 	const unsigned short num_tasks = sizeof(tasks)/sizeof(*tasks);
 	
-	//Moving Blocks SM
-	task1.state = MB_Start;
+	//Input SM
+	task1.state = I_Start;
 	task1.period = 100;
 	task1.elapsedTime = task1.period;
-	task1.TickFct = &MB_Tick;
+	task1.TickFct = &I_Tick;
 	
-	/*task2.state = DB_Start;
+	//Moving Blocks SM
+	task2.state = MB_Start;
 	task2.period = 100;
 	task2.elapsedTime = task2.period;
-	task2.TickFct = &DB_Tick;
-	*/
+	task2.TickFct = &MB_Tick;
+	
+	//Dropping Blocks SM
+	task3.state = DB_Start;
+	task3.period = 100;
+	task3.elapsedTime = task3.period;
+	task3.TickFct = &DB_Tick;
 	
 	//LED Matrix SM
-	task3.state = LM_Start;
-	task3.period = 2;
-	task3.elapsedTime = task3.period;
-	task3.TickFct = &LM_Tick;
+	task4.state = LM_Start;
+	task4.period = 2;
+	task4.elapsedTime = task4.period;
+	task4.TickFct = &LM_Tick;
 	
 	unsigned long GCD = tasks[0]->period;
 	static unsigned char j = 0;
