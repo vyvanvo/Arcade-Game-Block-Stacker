@@ -22,7 +22,7 @@
 
 //global variables
 unsigned char blocks[9] = {0xFF, 0xC7, 0xC7, 0xE7, 0xE7, 0xE7, 0xF7, 0xF7, 0xF7};
-unsigned char blocks_speed[9] = {0, 6, 6, 4, 4, 4, 2, 2, 2}; //speed of blocks moving side to side
+unsigned char blocks_speed[9] = {0, 3, 3, 2, 2, 2, 1, 1, 1}; //speed of blocks moving side to side
 unsigned char end_pos[9] = {0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}; //stopping position of block
 unsigned char blocks_dropped[9] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //block tower
 unsigned char j = 1; // blocks array pointer -> initially set to 1
@@ -31,12 +31,73 @@ unsigned char j = 1; // blocks array pointer -> initially set to 1
 
 unsigned char curr_block; //current block that is moving side to side (col)
 
-//unsigned char drop = 0; //boolean: 1 -> block that is moving side to side stops and drops, 0 -> block does not drop and continues to move side to side
+unsigned char drop = 0; //boolean: 1 -> block that is moving side to side stops and drops, 0 -> block does not drop and continues to move side to side
 
 //const variable
 unsigned char start_pos = 0x80;
 unsigned char off = 0xFF;
 
+enum I_States {I_Start, I_Wait, I_Drop, I_Hold} i_state;
+
+int I_Tick(int state) {
+
+	//local variables
+	unsigned char drop_btn = ~PINB & 0x40;
+
+	switch (state) { //transitions
+		case I_Start:
+			state = I_Wait;
+			break;
+		
+		case I_Wait:
+			if (drop_btn) {
+				state = I_Drop;
+				drop = 1;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+			break;
+			
+		case I_Drop:
+			if (drop_btn) {
+				state = I_Hold;
+				drop = 0;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+		case I_Hold:
+			if (drop_btn) {
+				state = I_Hold;
+			}
+			else {
+				state = I_Wait;
+			}
+			
+		default:
+			break;
+	}
+	
+	switch(state) { //state actions
+		case I_Wait:
+			drop = 0;
+			break;
+		
+		case I_Drop:
+			break;
+			
+		case I_Hold:
+			break;
+			
+		default:
+			break;
+	}
+	
+	return state;
+}
 
 enum MB_States {MB_Start, MB_Right, MB_Left, MB_Fall, MB_CalculateBlock, MB_DisplayLose, MB_DisplayWin} mb_state;
 
@@ -56,7 +117,7 @@ int MB_Tick(int state) {
 	static unsigned char blink_on = 1; //display win, 1 -> all lights are on, 0 -> all lights off
 	
 	//inputs
-	unsigned char drop = ~PINB & 0x40; //drop btn -> replace with mic
+	//unsigned char drop = ~PINB & 0x40; //drop btn -> replace with mic
 	unsigned char reset = ~PINB & 0x80; //restart btn
 	
 	switch (state) { //transitions
@@ -286,10 +347,6 @@ int LM_Tick(int state) {
 	}
 	
 	switch(state) { //state actions
-		case LM_Start:
-		
-			break;
-		
 		case LM_DisplayMatrix:
 			lm_col = blocks_dropped[m];
 			lm_row = end_pos[m];
@@ -320,16 +377,16 @@ int main(void) {
 	DDRA = 0xFF; PORTA = 0x00; //initialize PORTA -> outputs
 	
 	//declare an array of tasks
-	static task task2, task4;
-	task *tasks[] = {&task2, &task4};
+	static task task1, task2, task4;
+	task *tasks[] = {&task1, &task2, &task4};
 	const unsigned short num_tasks = sizeof(tasks)/sizeof(*tasks);
 	
-	/*//Input SM
+	//Input SM
 	task1.state = I_Start;
 	task1.period = 100;
 	task1.elapsedTime = task1.period;
 	task1.TickFct = &I_Tick;
-	*/
+	
 	//Moving Blocks SM
 	task2.state = MB_Start;
 	task2.period = 100;
