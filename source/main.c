@@ -110,7 +110,7 @@ int MB_Tick(int state) {
 	static unsigned char prev_block;
 	static unsigned char tmpcurr_block;
 	static unsigned char db_row; //row position as it fall in dropping block
-	static unsigned char k = 0; //counter to check bit to do bit manipulation to get block_dropped
+	static unsigned char k = 0; //counter to check bit to do bit manipulation to get block_dropped & end_pos
 	static unsigned char n = 0; //counter to check bit to do bit manipulation to get block_dropped
 	static unsigned char tmp; // tmp to bitmask if (curr_block & 0x01) == (prev_block & 0x01)
 	static unsigned char block_dropped; //the block that was dropped after calculating the block to see if the bottom carries it
@@ -206,6 +206,26 @@ int MB_Tick(int state) {
 		case MB_DisplayLose:
 			if (reset) {
 				state = MB_Right;
+				
+				//reset blocks_dropped array and end_pos array
+				end_pos[0] = 0x00;
+				blocks_dropped[0] = 0xFF;
+				
+				for (k = 0; k < 8; k++) {
+					blocks_dropped[k+1] = 0xFF;
+					end_pos[k+1] = (0x01 << k);
+				}
+				
+				//reset starting postiion
+				j = 1;
+				
+				//set new game with initial moving block
+				curr_block = blocks[j];
+				speed = blocks_speed[j];
+			
+				end_pos[0] = start_pos;
+				blocks_dropped[0] = curr_block;
+				
 			}
 			else {
 				state = MB_DisplayLose;
@@ -215,6 +235,26 @@ int MB_Tick(int state) {
 		case MB_DisplayWin:
 			if (reset) {
 				state = MB_Right;
+				
+				//reset blocks_dropped array and end_pos array
+				end_pos[0] = 0x00;
+				blocks_dropped[0] = 0xFF;
+				
+				for (k = 0; k < 8; k++) {
+					blocks_dropped[k+1] = 0xFF;
+					end_pos[k+1] = (0x01 << k);
+				}
+				
+				//reset starting postiion
+				j = 1;
+				
+				//set new game with initial moving block
+				curr_block = blocks[j];
+				speed = blocks_speed[j];
+			
+				end_pos[0] = start_pos;
+				blocks_dropped[0] = curr_block;
+				
 			}
 			else {
 				state = MB_DisplayWin;
