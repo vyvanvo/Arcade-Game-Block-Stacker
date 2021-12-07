@@ -8,7 +8,7 @@
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
  *	
- *	Demo Link: https://youtu.be/0tT-UEeZVoo
+ *	Demo Link: https://youtu.be/0Ym5bxLDB28
  *
  */
 #include <avr/io.h>
@@ -218,6 +218,7 @@ int MB_Tick(int state) {
 				
 				//reset starting postiion
 				j = 1;
+				i = 0;
 				
 				//set new game with initial moving block
 				curr_block = blocks[j];
@@ -247,6 +248,7 @@ int MB_Tick(int state) {
 				
 				//reset starting postiion
 				j = 1;
+				i = 0;
 				
 				//set new game with initial moving block
 				curr_block = blocks[j];
