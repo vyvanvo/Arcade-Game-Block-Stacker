@@ -17,31 +17,191 @@
 #include "simAVRHeader.h"
 #include "timer.h"
 #include "scheduler.h"
-#include "shift_reg.h"
+//#include "shift_reg.h"
 #endif
+
+//Receiver SM
+enum R_States {R_Start, R_Wait, R_GameDisplay, R_DisplayWin, R_DisplayLose} r_state;
+
+int R_Tick(int state) {
+	
+	static unsigned char received;
+	
+	switch (state) { //transitions
+		case R_Start:
+			state = R_Wait;
+			break;
+			
+		case R_Wait:			
+			if (received == '0') {
+				PORTA = 0x01; //go to Game Display
+				LCD_DisplayString(1, "Game In Progress");
+				state = R_GameDisplay;
+			}
+			else if (received == '1') {
+				PORTA = 0x02; //go to Display Win
+				LCD_DisplayString(1, "You Win!");
+				state = R_DisplayWin;
+			}
+			else if (received == '2') {
+				PORTA = 0x03; //go to Display Lose
+				LCD_DisplayString(1, "Game Over!");
+				state = R_DisplayLose;
+			}
+			else {
+				PORTA = 0x00;
+			}
+				
+			break;
+			
+		case R_GameDisplay:			
+			if (received == '0') {
+				//PORTA = 0x01; //go to Game Display
+				state = R_GameDisplay;
+			}
+			else if (received == '1') {
+				PORTA = 0x02; //go to Display Win
+				LCD_DisplayString(1, "You Win!");
+				state = R_DisplayWin;
+			}
+			else if (received == '2') {
+				PORTA = 0x03; //go to Display Lose
+				LCD_DisplayString(1, "Game Over!");
+				state = R_DisplayLose;
+			}
+			else {
+				PORTA = 0x00;
+			}
+			
+			break;
+			
+		case R_DisplayWin:			
+			if (received == '0') {
+				PORTA = 0x01; //go to Game Display
+				LCD_DisplayString(1, "Game In Progress");
+				state = R_GameDisplay;
+			}
+			else if (received == '1') {
+				//PORTA = 0x02; //go to Display Win
+				state = R_DisplayWin;
+			}
+			else if (received == '2') {
+				PORTA = 0x03; //go to Display Lose
+				LCD_DisplayString(1, "Game Over!");
+				state = R_DisplayLose;
+			}
+			else {
+				PORTA = 0x00;
+			}
+				
+			break;
+			
+		case R_DisplayLose:			
+			if (received == '0') {
+				PORTA = 0x01; //go to Game Display
+				LCD_DisplayString(1, "Game In Progress");
+				state = R_GameDisplay;
+			}
+			else if (received == '1') {
+				PORTA = 0x02; //go to Display Win
+				LCD_DisplayString(1, "You Win!");
+				state = R_DisplayWin;
+			}
+			else if (received == '2') {
+				//PORTA = 0x03; //go to Display Lose
+				state = R_DisplayLose;
+			}
+			else {
+				PORTA = 0x00;
+			}
+				
+			break;
+			
+		default:
+			break;
+	}
+	
+	switch (state) { //state actions
+		case R_Wait:
+			if (USART_HasReceived(0) ) {
+				received = USART_Receive(0);
+			}
+			
+			break;
+			
+		case R_GameDisplay:
+			if (USART_HasReceived(0) ) {
+				received = USART_Receive(0);
+			}
+				
+			break;
+			
+		case R_DisplayWin:
+			if (USART_HasReceived(0) ) {
+				received = USART_Receive(0);
+			}
+			
+			break;
+			
+		case R_DisplayLose:
+			if (USART_HasReceived(0) ) {
+				received = USART_Receive(0);
+			}
+			
+			break;
+			
+		default:
+		
+			break;
+	}
+	
+	return state;
+}
 
 int main(void) {
     /* Insert DDR and PORT initializations */
 	DDRD = 0xFE; PORTD = 0x01; //initialize PORTC -> outputs
 	//DDRB = 0x00; PORTB = 0xFF; //initialize PORTB: outputs
-	//DDRA = 0xFF; PORTA = 0x00; //initialize PORTA -> outputs
+	DDRC = 0xFF; PORTC = 0x00; //initialize PORTC -> outputs
+	DDRA = 0xFF; PORTA = 0x00; //initialize PORTA -> outputs
 	
-	initUSART();
-	TimerSet(500);
+	initUSART(0);
+	TimerSet(1);
 	TimerOn();
 	
-	unsigned char received;
+	LCD_init();
+	LCD_DisplayString(1, "Game In Progress");
+	
+	//declare an array of tasks
+	static task task1;
+	task *tasks[] = {&task1};
+	const unsigned short num_tasks = sizeof(tasks)/sizeof(*tasks);
+	
+	//Input SM
+	task1.state = R_Start;
+	task1.period = 1;
+	task1.elapsedTime = task1.period;
+	task1.TickFct = &R_Tick;
+	
+	unsigned long GCD = tasks[0]->period;
+	static unsigned char j = 0;
+	for (j = 1; j < num_tasks; j++) {
+		GCD = findGCD(GCD, tasks[j]->period);
+	}
+	
+	TimerSet(GCD);
+	TimerOn();
+	
+	static unsigned char i = 0;
 	
 	while (1) {
-		if (USART_HasReceived(0) ) {
-			received = USART_Receive();
-			
-			if (received == '1') {
-				PORTD = 0x80;
+	
+		for (i = 0; i < num_tasks; i++) {
+			if (tasks[i]->elapsedTime == tasks[i]->period) {	//task is ready to tick
+				tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);	//set next state
+				tasks[i]->elapsedTime = 0;	//reset the elapsed time for next tick
 			}
-			else if (received == '0') {
-				PORTD = 0x40;
-			}
+			tasks[i]->elapsedTime += GCD;
 		}
 		
 		while(!TimerFlag);

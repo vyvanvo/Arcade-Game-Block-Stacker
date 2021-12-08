@@ -22,7 +22,7 @@
 
 int main(void) {
     /* Insert DDR and PORT initializations */
-	DDRD = 0xFF; PORTD = 0x00; //initialize PORTC -> outputs
+	//DDRD = 0xFF; PORTD = 0x00; //initialize PORTC -> outputs
 	DDRB = 0x00; PORTB = 0xFF; //initialize PORTB: outputs
 	//DDRA = 0xFF; PORTA = 0x00; //initialize PORTA -> outputs
 	
@@ -33,12 +33,13 @@ int main(void) {
 	while (1) {
 	
 		unsigned char btn_pin = ~PINB & 0x80;
+		unsigned char btn_pin2 = ~PINB & 0x40;
 	
 		if (btn_pin) {
-			//PORTD = 0x80;
-			if (USART_IsSendReady()) {
+			
+			if (USART_IsSendReady(0)) {
 				//send data
-				USART_Send('1');
+				USART_Send('1', 0);
 				PORTD = 0x80;
 			}
 		}
@@ -46,10 +47,22 @@ int main(void) {
 		
 			if (USART_IsSendReady(0)) {
 				//send data
-				USART_Send('0');
+				USART_Send('0', 0);
 				PORTD = 0x40;
 				
 			}
+		}
+		
+		if (btn_pin2) {
+			
+			if (USART_IsSendReady(0)) {
+				//send data
+				USART_Send('2', 0);
+				PORTD = 0xC0;
+			}
+		}
+		else {
+			
 		}
 		
 		while(!TimerFlag);
