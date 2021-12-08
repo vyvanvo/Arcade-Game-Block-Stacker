@@ -3,7 +3,7 @@
  *	Lab Section: 022
  *	Assignment: Final Project 
  *	Exercise Description: Block Stacker
- *	Display LED Matrix
+ *	Display LCD Screen
  *
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
