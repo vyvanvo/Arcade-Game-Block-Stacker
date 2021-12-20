@@ -1,4 +1,4 @@
-# Arcade-Game-Block-Stacker
+# Arcade Game: Block Stacker
 Demo Links
 
 Final Project Demo: https://youtu.be/VT4SVJy1_TI 
